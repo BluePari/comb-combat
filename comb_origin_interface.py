@@ -8,7 +8,6 @@ class Settings:
             3: {1: 0.61, 4: 0.65, 5: 0.7, 6: 0.76, 7: 0.81, 9: 0.88, 10: 0.94, 11: 1},
             4: {1: 0.72, 4: 0.76, 5: 0.8, 6: 0.85, 7: 0.89, 9: 0.94, 10: 1},
             5: {1: 0.85, 4: 0.88, 5: 0.92, 6: 0.97, 7: 1},
-            6: {1: 1},
         }
 
     def get_damage_rate(self, player_num, turn):
@@ -147,7 +146,7 @@ class Game:
             1000,
         ] * 2
         self.turn = 0
-        self.damage_rate = 0
+        self.damage_rate = 1
 
     def get_command(self):
         return input("请输入控制指令")
