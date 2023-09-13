@@ -30,11 +30,11 @@ class Player:
         self.score = 0
 
     def place_piece(self, position, chess):
-        piece = [int(num) for num in str(chess)]
+        piece = [int(num) for num in chess]
         self.chessboard[position] = piece[-3]
         self.chessboard[position + 20] = piece[-2]
         self.chessboard[position + 40] = piece[-1]
-        if chess == 1000:
+        if chess == "1000":
             self.chessboard_to_show[position] = "any"
         else:
             self.chessboard_to_show[position] = str(chess)
@@ -87,64 +87,10 @@ class Game:
         self.alive_players = []
         self.inactive_players = []
         self.card_pool1 = [
-            312,
-            412,
-            812,
-            352,
-            452,
-            852,
-            392,
-            492,
-            892,
-            316,
-            416,
-            816,
-            356,
-            456,
-            856,
-            396,
-            496,
-            896,
-            317,
-            417,
-            817,
-            357,
-            457,
-            857,
-            397,
-            497,
-            897,
+            num1 + num2 + num3 for num1 in "348" for num2 in "159" for num3 in "267"
         ] * 2
-        self.card_pool2 = [
-            312,
-            412,
-            812,
-            352,
-            452,
-            852,
-            392,
-            492,
-            892,
-            316,
-            416,
-            816,
-            356,
-            456,
-            856,
-            396,
-            496,
-            896,
-            317,
-            417,
-            817,
-            357,
-            457,
-            857,
-            397,
-            497,
-            897,
-            1000,
-        ] * 2
+        self.card_pool2 = self.card_pool1[:]
+        self.card_pool2.extend(["1000"] * 2)
         self.turn = 0
         self.damage_rate = 1
 
@@ -244,13 +190,28 @@ class Game:
             print("        |{}|".format(player.chessboard_to_show[12]))
             print(f"血量：{player.health}, 得分：{player.score}")
 
+    def check_sum_difference(self, card1, card2):
+        if (
+            abs(sum(int(num1) for num1 in card1) - sum(int(num2) for num2 in card2))
+            <= 4
+        ):
+            return True
+        return False
+
     def get_cards(self):
         card_list = []
         if self.turn == 1:
-            for i in range(len(self.alive_players)):
-                card_list.append(
+            attempted_cards = []
+            while not len(card_list) == len(self.alive_players):
+                attempted_cards.append(
                     self.card_pool1.pop(random.randint(0, len(self.card_pool1) - 1))
                 )
+                if (not card_list) or all(
+                    self.check_sum_difference(attempted_cards[-1], card)
+                    for card in card_list
+                ):
+                    card_list.append(attempted_cards.pop())
+            self.card_pool1.extend(attempted_cards)
         elif self.turn % 7 == 1:
             for i in range(len(self.alive_players) + 1):
                 card_list.append(
@@ -352,12 +313,12 @@ class Game:
             if delta > 0:
                 player2_info = "({})".format(-delta)
                 self.player_dict[player2].health -= delta
-                self.is_dead(player2)
         if delta < 0:
             player1_info = "({})".format(delta)
             self.player_dict[player1].health += delta
-            self.is_dead(player1)
         print(("{}{} vs {}{}").format(player1, player1_info, player2, player2_info))
+        self.is_dead(player1)
+        self.is_dead(player2)
 
     def battle_phase(self):
         if self.turn % 7 == 1 or self.turn == 2:
