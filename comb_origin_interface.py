@@ -259,12 +259,10 @@ class Game:
             )
             for sorted_player in sorted_players:
                 self.show_game_status()
-
                 self.inactive_players.append(sorted_player)
                 print(f"轮到玩家{sorted_player}选择")
                 while self.inactive_players:
                     self.show_card_list(card_list)
-                    print()
                     player_input = self.get_player_input()
                     player = player_input[0]
                     card_and_position = player_input[1].split()
@@ -353,7 +351,8 @@ class Game:
                     print(f"玩家{player}退出了游戏，目前一共有{len(self.player_list)}人")
                 else:
                     print("控制指令输入错误：这个玩家根本没加入游戏啊")
-
+            elif command.startswith("#list"):
+                print(f"当前加入游戏的玩家有{self.player_list}")
             elif command.startswith("#start"):
                 if len(self.player_list) < 2:
                     print("控制指令输入错误：人数不足，至少需要2人")
@@ -378,6 +377,7 @@ class Game:
             self.card_place_phase()
             self.battle_phase()
         print(f"玩家{self.alive_players[0]}获胜")
+        self.show_game_status()
 
 
 new_game = Game(Settings())
