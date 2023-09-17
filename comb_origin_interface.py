@@ -2,22 +2,58 @@ import random
 
 
 class Settings:
-    def __init__(self):
+    def __init__(
+        self,
+        damage_rate,
+        # "table":每个回合从damage_rate_table读取本回合damage_rate
+        # "disabled":每个回合的damage_rate固定为1
+        special_rules,
+        # "random":随机选择特殊规则
+        # "disabled":不启用特殊规则
+        # "no-small":大的要来了--卡池中没有1
+        # "no-middle":两极分化--卡池中没有5
+        # "no-big":大的没了--卡池中没有9
+        # "windfall":天降恩泽--初始回合每个人获得一张万能牌
+        # "colorful":调色盘--卡池中添加大量万能牌
+        # "valuable_one":有1吗--每行1额外加12分
+        # "foresee":小透不算挂--提前公布下回合的卡
+        # 以下是不会被随机到的超级规则
+        # "%super-colorful"超级调色盘--初始回合每个人获得一张万能牌，卡池中的一半替换为万能牌
+    ):
+        self.damage_rate = damage_rate
+        self.special_rules = special_rules
         self.damage_rate_table = {
             2: {1: 0.51, 4: 0.57, 5: 0.64, 6: 0.71, 7: 0.8, 9: 0.89, 10: 0.99, 11: 1},
             3: {1: 0.61, 4: 0.65, 5: 0.7, 6: 0.76, 7: 0.81, 9: 0.88, 10: 0.94, 11: 1},
             4: {1: 0.72, 4: 0.76, 5: 0.8, 6: 0.85, 7: 0.89, 9: 0.94, 10: 1},
             5: {1: 0.85, 4: 0.88, 5: 0.92, 6: 0.97, 7: 1},
+            6: {1: 1},
+            7: {1: 1.18, 4: 1.11, 5: 1.04, 6: 1},
+            8: {1: 1.40, 4: 1.32, 5: 1.25, 6: 1.18, 7: 1.12, 9: 1.06, 10: 1},
         }
 
+        if special_rules == "random":
+            self.special_rules = random.choice(
+                [
+                    "disabled",
+                    "disabled",
+                    "disabled",
+                    "disabled",
+                    "disabled",
+                    "disabled",
+                    "disabled",
+                    "no-small",
+                    "no-middle",
+                    "no-big",
+                    "windfall",
+                    "colorful",
+                    "valuable-one",
+                    "foresee",
+                ]
+            )
+
     def get_damage_rate(self, player_num, turn):
-        if (
-            player_num in self.damage_rate_table
-            and turn in self.damage_rate_table[player_num]
-        ):
-            return self.damage_rate_table[player_num][turn]
-        else:
-            return None
+        return self.damage_rate_table[player_num][turn]
 
 
 class Player:
@@ -29,7 +65,7 @@ class Player:
         self.health = 150
         self.score = 0
 
-    def place_piece(self, position, chess):
+    def place_piece(self, position, chess, special_rule):
         piece = [int(num) for num in chess]
         self.chessboard[position] = piece[-3]
         self.chessboard[position + 20] = piece[-2]
@@ -38,13 +74,13 @@ class Player:
             self.chessboard_to_show[position] = "any"
         else:
             self.chessboard_to_show[position] = str(chess)
-        score_delta = self.check_score()
+        score_delta = self.check_score(special_rule)
         if score_delta:
             print(f"玩家{self.username}设置成功，获得了{score_delta}点积分")
         else:
             print(f"玩家{self.username}设置成功")
 
-    def check_score(self):
+    def check_score(self, special_rule):
         score = 0
 
         lines = [
@@ -69,10 +105,14 @@ class Player:
             unique_elements = {self.chessboard[num] for num in line}
             if None in unique_elements:
                 continue
-            if len(unique_elements) == 1 or (
+            elif len(unique_elements) == 1 and 0 in unique_elements:
+                score += len(line) * 10
+            elif len(unique_elements) == 1 or (
                 len(unique_elements) == 2 and 0 in unique_elements
             ):
                 score += sum(len(line) * piece for piece in unique_elements)
+                if special_rule and 1 in unique_elements:
+                    score += 12
 
         old_score = self.score
         self.score = score
@@ -86,13 +126,42 @@ class Game:
         self.player_data = []
         self.alive_players = []
         self.inactive_players = []
-        self.card_pool1 = [
-            num1 + num2 + num3 for num1 in "348" for num2 in "159" for num3 in "267"
-        ] * 2
+        self.card_pool1 = self.card_pool_generate()
         self.card_pool2 = self.card_pool1[:]
         self.card_pool2.extend(["1000"] * 2)
         self.turn = 0
         self.damage_rate = 1
+        self.card_list_next = None
+
+    def card_pool_generate(self):
+        if self.settings.special_rules == "no-small":
+            return [
+                num1 + num2 + num3 for num1 in "348" for num2 in "59" for num3 in "267"
+            ] * 2
+        elif self.settings.special_rules == "no-middle":
+            return [
+                num1 + num2 + num3 for num1 in "348" for num2 in "19" for num3 in "267"
+            ] * 2
+        elif self.settings.special_rules == "no-big":
+            return [
+                num1 + num2 + num3 for num1 in "348" for num2 in "15" for num3 in "267"
+            ] * 2
+        elif self.settings.special_rules == "colorful":
+            card_pool = [
+                num1 + num2 + num3 for num1 in "348" for num2 in "159" for num3 in "267"
+            ] * 2
+            card_pool.extend(["1000"] * 3)
+            return card_pool
+        elif self.settings.special_rules == "super-colorful":
+            card_pool = [
+                num1 + num2 + num3 for num1 in "348" for num2 in "159" for num3 in "267"
+            ]
+            card_pool.extend(["1000"] * 27)
+            return card_pool
+        else:
+            return [
+                num1 + num2 + num3 for num1 in "348" for num2 in "159" for num3 in "267"
+            ] * 2
 
     def get_command(self):
         return input("请输入控制指令")
@@ -206,9 +275,13 @@ class Game:
                 attempted_cards.append(
                     self.card_pool1.pop(random.randint(0, len(self.card_pool1) - 1))
                 )
-                if (not card_list) or all(
-                    self.check_sum_difference(attempted_cards[-1], card)
-                    for card in card_list
+                attempted_card = attempted_cards[-1]
+                if attempted_card != "1000" and (
+                    (not card_list)
+                    or all(
+                        self.check_sum_difference(attempted_card, card)
+                        for card in card_list
+                    )
                 ):
                     card_list.append(attempted_cards.pop())
             self.card_pool1.extend(attempted_cards)
@@ -226,7 +299,15 @@ class Game:
     def show_card_list(self, card_list):
         for index, card in enumerate(card_list):
             print(index, card, end=";")
+            if self.card_list_next:
+                print(f"下一张牌是{self.card_list_next[0]}")
         print()
+
+    def is_valuable_one(self):
+        if self.settings.special_rules == "valuable-one":
+            return True
+        else:
+            return False
 
     def card_place_phase(self):
         print(f"第{self.turn}回合开始")
@@ -235,7 +316,13 @@ class Game:
             self.inactive_players = self.alive_players[:]
             print("初始回合，每个人随机获得一张牌")
             self.show_game_status()
-            card_list = self.get_cards()
+            if (
+                self.settings.special_rules == "windfall"
+                or self.settings.special_rules == "super-colorful"
+            ):
+                card_list = ["1000"] * len(self.player_list)
+            else:
+                card_list = self.get_cards()
             self.show_card_list(card_list)
             while self.inactive_players:
                 player_input = self.get_player_input()
@@ -244,7 +331,9 @@ class Game:
                 if self.check_player(player) and self.check_position(position):
                     player = int(player)
                     position = int(position)
-                    self.player_data[player].place_piece(position, card_list[player])
+                    self.player_data[player].place_piece(
+                        position, card_list[player], self.is_valuable_one()
+                    )
                     self.inactive_players.remove(self.player_list[player])
         elif self.turn % 7 == 1:
             print("公共选牌阶段，按照血量顺序选牌")
@@ -273,14 +362,23 @@ class Game:
                         card = int(card_and_position[0])
                         position = int(card_and_position[1])
                         self.player_data[player].place_piece(
-                            position, card_list.pop(card)
+                            position, card_list.pop(card), self.is_valuable_one()
                         )
                         self.inactive_players.pop()
         else:
             self.inactive_players = self.alive_players[:]
             self.show_game_status()
-            card_list = self.get_cards()
-            self.show_card_list(card_list)
+            if self.settings.special_rules == "foresee":
+                if self.turn == 2:
+                    card_list = self.get_cards()
+                    self.card_list_next = self.get_cards()
+                else:
+                    card_list = self.card_list_next
+                    self.card_list_next = self.get_cards()
+                self.show_card_list(card_list)
+            else:
+                card_list = self.get_cards()
+                self.show_card_list(card_list)
             while self.inactive_players:
                 player_input = self.get_player_input()
                 player = player_input[0]
@@ -288,17 +386,22 @@ class Game:
                 if self.check_player(player) and self.check_position(position):
                     player = int(player)
                     position = int(position)
-                    self.player_data[player].place_piece(position, card_list[0])
+                    self.player_data[player].place_piece(
+                        position, card_list[0], self.is_valuable_one()
+                    )
                     self.inactive_players.remove(self.player_list[player])
 
-    def is_dead(self, player):
-        if self.player_dict[player].health <= 0:
-            print(f"{player}已被淘汰")
-            self.alive_players.remove(player)
+    def is_dead(self, player_username):
+        if self.player_dict[player_username].health <= 0:
+            print(f"{player_username}已被淘汰")
+            self.alive_players.remove(player_username)
 
-    def battle(self, player1, player2, mirror=False):
+    def battle(self, player1_username, player2_username, mirror=False):
         delta = int(
-            (self.player_dict[player1].score - self.player_dict[player2].score)
+            (
+                self.player_dict[player1_username].score
+                - self.player_dict[player2_username].score
+            )
             * self.damage_rate
         )
         player1_info = ""
@@ -310,13 +413,15 @@ class Game:
                 player2_info = "(0)"
             if delta > 0:
                 player2_info = "({})".format(-delta)
-                self.player_dict[player2].health -= delta
+                self.player_dict[player2_username].health -= delta
         if delta < 0:
             player1_info = "({})".format(delta)
-            self.player_dict[player1].health += delta
-        print(("{}{} vs {}{}").format(player1, player1_info, player2, player2_info))
-        self.is_dead(player1)
-        self.is_dead(player2)
+            self.player_dict[player1_username].health += delta
+        print(
+            ("{}{} vs {}{}").format(
+                player1_username, player1_info, player2_username, player2_info
+            )
+        )
 
     def battle_phase(self):
         if self.turn % 7 == 1 or self.turn == 2:
@@ -329,28 +434,36 @@ class Game:
                 self.battle(battle_with_mirror, random.choice(pairs), True)
             for i in range(0, len(pairs), 2):
                 self.battle(pairs[i], pairs[i + 1])
+            for player in self.alive_players:
+                self.is_dead(player)
 
     def waiting_for_players(self):
         while True:
             command = self.get_command()
             if command.startswith("#join"):
-                if len(self.player_list) > 12:
+                if len(self.player_list) > 8:
                     print("控制指令输入错误：人满啦")
                 else:
+                    try:
+                        player = command.split()[1]
+                        if player in self.player_list:
+                            print("控制指令输入错误：重复的用户名")
+                            continue
+                        else:
+                            self.player_list.append(player)
+                            print(f"玩家{player}加入了游戏，目前一共有{len(self.player_list)}人")
+                    except IndexError:
+                        print("系统错误：谁要加入？")
+            elif command.startswith("#quit"):
+                try:
                     player = command.split()[1]
                     if player in self.player_list:
-                        print("控制指令输入错误：重复的用户名")
-                        continue
+                        self.player_list.remove(player)
+                        print(f"玩家{player}退出了游戏，目前一共有{len(self.player_list)}人")
                     else:
-                        self.player_list.append(player)
-                        print(f"玩家{player}加入了游戏，目前一共有{len(self.player_list)}人")
-            elif command.startswith("#quit"):
-                player = command.split()[1]
-                if player in self.player_list:
-                    self.player_list.remove(player)
-                    print(f"玩家{player}退出了游戏，目前一共有{len(self.player_list)}人")
-                else:
-                    print("控制指令输入错误：这个玩家根本没加入游戏啊")
+                        print("控制指令输入错误：这个玩家根本没加入游戏啊")
+                except IndexError:
+                    print("系统错误：谁要退出？")
             elif command.startswith("#list"):
                 print(f"当前加入游戏的玩家有{self.player_list}")
             elif command.startswith("#start"):
@@ -368,18 +481,22 @@ class Game:
             self.player_data.append(Player(username, index))
         self.player_dict = {p.username: p for p in self.player_data}
         self.alive_players = self.player_list[:]
+        print(f"本局随机事件为{self.settings.special_rules}")
         while len(self.alive_players) != 1:
             self.turn += 1
-            if self.settings.get_damage_rate(len(self.player_list), self.turn):
-                self.damage_rate = self.settings.get_damage_rate(
-                    len(self.player_list), self.turn
-                )
+            if self.settings.damage_rate == "table":
+                try:
+                    self.damage_rate = self.settings.get_damage_rate(
+                        len(self.player_list), self.turn
+                    )
+                except KeyError:
+                    pass
             self.card_place_phase()
             self.battle_phase()
         print(f"玩家{self.alive_players[0]}获胜")
         self.show_game_status()
 
 
-new_game = Game(Settings())
+new_game = Game(Settings("table", "random"))
 new_game.waiting_for_players()
 new_game.start()
